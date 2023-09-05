@@ -14,7 +14,6 @@ public class MessageCodecController implements MessageCodec {
     for (Map.Entry<String, String> entry : message.headers.entrySet()) {
         encodeHeader(entry.getKey(), entry.getValue(), buffer);
     }
-
     // Encode payload length
     encodePayloadLength(message.payload.length, buffer);
 
