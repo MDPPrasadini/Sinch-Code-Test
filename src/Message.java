@@ -8,8 +8,4 @@ public class Message {
     public Message() {
         headers = new HashMap<>();
     }
-
-    public boolean isValid() {
-        return headers.size() <= 63 && payload.length <= 256 * 1024;
-    }
 }

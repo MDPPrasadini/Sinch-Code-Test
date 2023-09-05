@@ -5,7 +5,7 @@ public class Main {
         message.headers.put("Header2", "Value2");
         message.payload = "This is the payload.".getBytes();
 
-        SimpleMessageCodec codec = new SimpleMessageCodec();
+        MessageCodecController codec = new MessageCodecController();
         byte[] encodedMessage = codec.encode(message);
 
         Message decodedMessage = codec.decode(encodedMessage);
