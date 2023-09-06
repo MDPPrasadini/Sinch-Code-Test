@@ -1,19 +1,27 @@
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public class MessageCodecController implements MessageCodec {
+    private static final int MAX_HEADER_SIZE = 2046; // Maximum size for an individual header (1023 bytes for name + 1023 bytes for value)
+    private static final int MAX_NUM_HEADERS = 63; // Maximum number of headers allowed
+    private static final int MAX_PAYLOAD_SIZE = 256 * 1024; // Maximum payload size (256 KiB)
+
     @Override
     public byte[] encode(Message message) {
-    int totalSize = calculateTotalSize(message);
-    ByteBuffer buffer = ByteBuffer.allocate(totalSize);
+        validateMessage(message);
+        int totalSize = calculateTotalSize(message);
+        ByteBuffer buffer = ByteBuffer.allocate(totalSize).order(ByteOrder.BIG_ENDIAN); // Explicitly set byte order to BIG_ENDIAN
 
-    // Encode header count
-    buffer.put((byte) message.headers.size());
+        // Encode header count
+        buffer.put((byte) message.headers.size());
 
-    // Encode headers
-    for (Map.Entry<String, String> entry : message.headers.entrySet()) {
-        encodeHeader(entry.getKey(), entry.getValue(), buffer);
+        // Encode headers
+        for (Map.Entry<String, String> entry : message.headers.entrySet()) {
+            encodeHeader(entry.getKey(), entry.getValue(), buffer);
     }
+
     // Encode payload length
     encodePayloadLength(message.payload.length, buffer);
 
@@ -25,7 +33,7 @@ public class MessageCodecController implements MessageCodec {
 
     @Override
     public Message decode(byte[] data) {
-        ByteBuffer buffer = ByteBuffer.wrap(data);
+        ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN); // Explicitly set byte order to BIG_ENDIAN
         Message message = new Message();
 
         // Decode header count
@@ -43,6 +51,7 @@ public class MessageCodecController implements MessageCodec {
         message.payload = new byte[payloadLength];
         buffer.get(message.payload);
 
+        validateMessage(message);
         return message;
     }
 
@@ -61,10 +70,18 @@ public class MessageCodecController implements MessageCodec {
     }
 
     private void encodeHeader(String name, String value, ByteBuffer buffer) {
-        buffer.putShort((short) name.length());
-        buffer.put(name.getBytes());
-        buffer.putShort((short) value.length());
-        buffer.put(value.getBytes());
+        byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
+        byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
+
+        // Check if the header size exceeds the limit
+        if (nameBytes.length > MAX_HEADER_SIZE || valueBytes.length > MAX_HEADER_SIZE) {
+            throw new IllegalArgumentException("Header size exceeds the allowed limit.");
+        }
+
+        buffer.putShort((short) nameBytes.length);
+        buffer.put(nameBytes);
+        buffer.putShort((short) valueBytes.length);
+        buffer.put(valueBytes);
     }
 
     private void encodePayloadLength(int length, ByteBuffer buffer) {
@@ -74,14 +91,22 @@ public class MessageCodecController implements MessageCodec {
     }
 
     private void decodeHeader(ByteBuffer buffer, Map<String, String> headers) {
+
         short nameLength = buffer.getShort();
         byte[] nameBytes = new byte[nameLength];
         buffer.get(nameBytes);
-        String name = new String(nameBytes);
+        String name = new String(nameBytes, StandardCharsets.UTF_8);
+
         short valueLength = buffer.getShort();
         byte[] valueBytes = new byte[valueLength];
         buffer.get(valueBytes);
-        String value = new String(valueBytes);
+        String value = new String(valueBytes, StandardCharsets.UTF_8);
+
+        // Check if the decoded header size exceeds the limit
+        if (nameLength > MAX_HEADER_SIZE || valueLength > MAX_HEADER_SIZE) {
+            throw new IllegalArgumentException("Decoded header size exceeds the allowed limit.");
+        }
+
         headers.put(name, value);
     }
 
@@ -90,5 +115,25 @@ public class MessageCodecController implements MessageCodec {
         length |= (buffer.get() & 0xFF) << 8;
         length |= (buffer.get() & 0xFF);
         return length;
+    }
+
+    private void validateMessage(Message message) {
+        // Validate header
+        for (Map.Entry<String, String> entry : message.headers.entrySet()) {
+            if (entry.getKey().length() > MAX_HEADER_SIZE || entry.getValue().length() > MAX_HEADER_SIZE) {
+                throw new IllegalArgumentException("Header size exceeds the allowed limit.");
+            }
+        }
+
+        // Validate total message size (headers + payload)
+        int totalSize = calculateTotalSize(message);
+        if (totalSize > MAX_PAYLOAD_SIZE) {
+            throw new IllegalArgumentException("Total message size exceeds the allowed payload limit.");
+        }
+
+        // Validate the number of headers
+        if (message.headers.size() > MAX_NUM_HEADERS) {
+            throw new IllegalArgumentException("Number of headers exceeds the allowed limit.");
+        }
     }
 }
