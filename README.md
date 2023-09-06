@@ -57,6 +57,23 @@ ex:
 - Decode the message using the MessageCodecController:
   Message decodedMessage = codec.decode(encodedMessage);
 
+## Project Structure
+The project follows a standard Java project structure:
+
+src/: Contains the Java source code files.
+test/: Contains unit tests for the code. // Not included
+lib/: You can place external libraries here if needed.
+README.md: This file containing project documentation.
+
+## Unit Testing
+The project should includes unit tests to ensure code reliability. You can run the tests using a testing framework like JUnit. In this assignment didnt add unit tests and better includes units test befor use to production.
+
+## Requirements
+To build and run this project, you need the following:
+
+- Java Development Kit (JDK)
+- Gradle (or any build tool of your choice)
+
 
 
 
